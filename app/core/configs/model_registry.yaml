@@ -116,7 +116,7 @@ model_registry:
   routing:
     text_generation:
       offline: ["gemma-4-e2b"]
-      online: ["groq", "gemma-4-e2b"]     # cloud first when reachable
+      online: ["groq", "openai/gpt-oss-120b"]     # cloud first when reachable
     speech_recognition: ["whisper-small", "meta-omnilingual-ctc"]
     translation: ["marianmt-int8"]
     text_to_speech: ["kokoro", "piper"]   # neural first, CPU fallback
