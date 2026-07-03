@@ -1,0 +1,140 @@
+# app/core/configs/model_registry.yaml
+# ---------------------------------------------------------------------------
+# AI model registry.
+#
+# Merged into the top-level "model_registry" section (Layer 3). The flat keys
+# at the top are validated by config_validator._ModelRegistryModel. The nested
+# "models" catalog and "providers" chains pass through (extra="allow") and are
+# consumed by FG2 model_manager and FG4 ASR/translation/TTS routers.
+#
+# Principle (from FG2 & FG4 SDDs): changing a model is a CONFIG change, never
+# a code change. Update the flat pointer + catalog entry only.
+# ---------------------------------------------------------------------------
+
+model_registry:
+
+  # ---- Validated flat pointers (active selections) -----------------------
+  intent_classifier: "all-MiniLM-L6-v2"
+  local_llm: "gemma-4-e2b"
+  cloud_llm: "groq"
+  embedding: "multilingual-e5-small"
+  asr_primary: "whisper-small"
+  translation: "marianmt-int8"
+  tts_primary: "kokoro"
+  tts_fallback: "piper"
+  prefer_local: true               # offline-first: prefer local models
+
+  # ---- Secondary / fallback selections -----------------------------------
+  asr_secondary: "meta-omnilingual-ctc"
+
+  # ---- Model catalog ------------------------------------------------------
+  # Each entry describes one model: task, engine/runtime, device, and coarse
+  # resource hints used by model_manager for load/unload + fallback decisions.
+  models:
+
+    # -- Intent classification (FG2) --------------------------------------
+    all-MiniLM-L6-v2:
+      task: "intent_classification"
+      engine: "sentence-transformers"
+      device: "cpu"
+      approx_vram_mb: 0
+      approx_ram_mb: 120
+      latency_ms: 15
+      offline: true
+
+    # -- Local LLM (FG2) --------------------------------------------------
+    gemma-4-e2b:
+      task: "text_generation"
+      engine: "llama.cpp"
+      device: "gpu"
+      quantization: "Q4_K_M"
+      approx_vram_mb: 3200
+      offline: true
+      context_window: 8192
+
+    # -- Cloud LLM (FG2) --------------------------------------------------
+    groq:
+      task: "text_generation"
+      engine: "groq-api"
+      device: "cloud"
+      offline: false
+      requires_network: true
+      api_key_env: "GROQ_API_KEY"
+
+    # -- Embeddings (FG2 / FG4) -------------------------------------------
+    multilingual-e5-small:
+      task: "embedding"
+      engine: "sentence-transformers"
+      device: "gpu"
+      approx_vram_mb: 450
+      offline: true
+
+    # -- ASR (FG4) --------------------------------------------------------
+    whisper-small:
+      task: "speech_recognition"
+      engine: "whisper"
+      device: "gpu"
+      approx_vram_mb: 900
+      offline: true
+      languages: ["en", "hi", "or", "multi"]
+
+    meta-omnilingual-ctc:
+      task: "speech_recognition"
+      engine: "sherpa-onnx"
+      device: "gpu"
+      approx_vram_mb: 700
+      offline: true
+
+    # -- Translation (FG4) ------------------------------------------------
+    marianmt-int8:
+      task: "translation"
+      engine: "ctranslate2"
+      device: "gpu"
+      precision: "int8"
+      approx_vram_mb: 400
+      offline: true
+
+    # -- TTS (FG1 / FG4) --------------------------------------------------
+    kokoro:
+      task: "text_to_speech"
+      engine: "sherpa-onnx"
+      device: "gpu"
+      approx_vram_mb: 350
+      offline: true
+      voices: ["kokoro_en", "kokoro_hi"]
+
+    piper:
+      task: "text_to_speech"
+      engine: "piper"
+      device: "cpu"
+      approx_ram_mb: 150
+      offline: true
+
+  # ---- Task-level routing chains -----------------------------------------
+  # Ordered fallback lists. Routers try entries left-to-right, skipping any
+  # model that is unavailable (e.g. cloud model when offline).
+  routing:
+    text_generation:
+      offline: ["gemma-4-e2b"]
+      online: ["groq", "gemma-4-e2b"]     # cloud first when reachable
+    speech_recognition: ["whisper-small", "meta-omnilingual-ctc"]
+    translation: ["marianmt-int8"]
+    text_to_speech: ["kokoro", "piper"]   # neural first, CPU fallback
+    embedding: ["multilingual-e5-small"]
+
+  # ---- Realtime search provider order (FG2 Search Manager) ---------------
+  # Deterministic order from the FG2 SDD: cache -> Tavily -> Brave ->
+  # DuckDuckGo+Trafilatura -> Gemini grounding.
+  search_providers:
+    order: ["cache", "tavily", "brave", "duckduckgo", "gemini_grounding"]
+    max_results: 5
+    allow_fallback: true
+    cache_ttl_days: 3
+
+  # ---- Resource governance ------------------------------------------------
+  # model_manager enforces these against live VRAM/RAM telemetry before load.
+  resources:
+    max_total_vram_mb: 5000        # keep headroom on an 8 GB-class GPU
+    max_loaded_models: 4
+    unload_idle_seconds: 300       # evict idle models to reclaim VRAM
+    on_vram_pressure: "unload_lowest_priority"

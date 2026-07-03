@@ -1,0 +1,112 @@
+# app/core/configs/permissions.yaml
+# ---------------------------------------------------------------------------
+# Roles, permissions, and risk gating (RBAC).
+#
+# Merged into the top-level "permissions" section (Layer 3). The validated
+# keys (default_role, roles, require_auth, continuous_verification) are
+# enforced by config_validator._PermissionsModel. The role hierarchy,
+# capability grants, and risk gates below pass through (extra="allow") and are
+# consumed by FG6 authorization (Casbin) + risk engine.
+#
+# Principles (FG6): Zero Trust, Least Privilege, Fail Secure. The lowest role
+# (guest) is the default; capabilities are granted upward, never assumed.
+# ---------------------------------------------------------------------------
+
+permissions:
+
+  # ---- Validated core keys -----------------------------------------------
+  default_role: "guest"            # fail-secure: least privilege by default
+  roles: ["guest", "user", "admin", "super_admin", "system"]
+  require_auth: true
+  continuous_verification: true    # FG6: re-verify identity during session
+
+  # ---- Role hierarchy -----------------------------------------------------
+  # Higher roles inherit all capabilities of the roles they list. Resolution
+  # is performed by role_manager (transitive inheritance).
+  hierarchy:
+    guest: []
+    user: ["guest"]
+    admin: ["user"]
+    super_admin: ["admin"]
+    system: ["super_admin"]        # internal automation identity
+
+  # ---- Capability grants --------------------------------------------------
+  # Each role lists the capabilities directly granted to it. Effective
+  # capabilities = own grants + inherited grants via hierarchy.
+  capabilities:
+
+    guest:
+      - "conversation"             # basic chat only
+      - "knowledge_query"
+
+    user:
+      - "realtime_query"
+      - "personal_query"           # access own encrypted personal memory
+      - "system_query"             # read-only system status
+      - "voice_interaction"
+      - "productivity_read"
+
+    admin:
+      - "system_control"           # FG3 native automation
+      - "automation"
+      - "scheduled_task"
+      - "plugin_use"               # run installed/approved plugins
+      - "productivity_write"
+      - "medium_risk_commands"
+
+    super_admin:
+      - "plugin_install"           # install/approve new plugins (FG7)
+      - "plugin_network_access"    # grant per-plugin network capability
+      - "high_risk_commands"       # delete/registry/process/power
+      - "security_command"
+      - "agent_control"            # enable/steer autonomous agents (FG9)
+      - "self_learning_control"    # gate self-modifying behavior (FG10)
+      - "user_management"
+
+    system:
+      - "internal_orchestration"   # reserved for AIOS internal services
+      - "recovery"                 # FG6 Layer 10 fail-safe/rollback
+
+  # ---- Risk gating --------------------------------------------------------
+  # Maps FG6 risk levels to the enforcement action + minimum role required to
+  # proceed. Consumed by the risk engine + escalation manager.
+  risk_gates:
+    low:
+      action: "allow"
+      min_role: "guest"
+    medium:
+      action: "confirm"           # require explicit user confirmation
+      min_role: "user"
+    high:
+      action: "reauth"            # re-verify identity before executing
+      min_role: "admin"
+    critical:
+      action: "reauth_and_confirm"
+      min_role: "super_admin"
+
+  # ---- Capabilities that always require elevated handling ----------------
+  # Regardless of role, these trigger the associated risk floor so they can
+  # never be executed silently.
+  sensitive_capabilities:
+    high_risk_commands: "high"
+    plugin_install: "high"
+    plugin_network_access: "high"
+    security_command: "critical"
+    agent_control: "critical"
+    self_learning_control: "critical"
+    user_management: "high"
+
+  # ---- Session / authentication policy -----------------------------------
+  session:
+    session_timeout_minutes: 30
+    reauth_interval_minutes: 15    # periodic re-verification window
+    max_failed_auth: 3             # lockout threshold (FG6 risk factor)
+    lockout_seconds: 300
+    require_mfa_for: ["admin", "super_admin", "system"]
+
+  # ---- Emergency controls -------------------------------------------------
+  emergency:
+    # Any authenticated user may trigger an emergency stop (FG3/FG5).
+    emergency_stop_min_role: "guest"
+    # Silent/Secure mode toggles require user-level authentication.
+    secure_mode_min_role: "user"

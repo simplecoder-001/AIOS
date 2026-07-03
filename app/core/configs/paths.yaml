@@ -1,0 +1,80 @@
+# app/core/configs/paths.yaml
+# ---------------------------------------------------------------------------
+# Optional filesystem path overrides.
+#
+# Merged into the top-level "paths" section (Layer 3). Canonical path
+# resolution is owned by paths.py (ProjectPaths); this file exists ONLY to let
+# operators override specific locations per-machine without code changes.
+#
+# Rules:
+#   * Leave a value blank/omitted to inherit the canonical default from
+#     ProjectPaths (recommended for most deployments).
+#   * Absolute paths are used as-is. Relative paths are resolved against the
+#     project root.
+#   * ${VAR:default} expands from the environment at load time.
+#   * Resources are treated as read-only assets; overriding them is supported
+#     but should point at a valid, existing asset tree.
+# ---------------------------------------------------------------------------
+
+paths:
+
+  # ---- Root override ------------------------------------------------------
+  # Highest-priority root hint. Normally left blank so paths.py resolves the
+  # root via project markers (pyproject.toml / main.py) or AIOS_ROOT.
+  root: "${AIOS_ROOT:}"
+
+  # ---- Top-level directories ---------------------------------------------
+  # Blank => inherit canonical default from ProjectPaths.
+  top_level:
+    app_dir: ""
+    data_dir: "${AIOS_DATA_DIR:}"
+    resources_dir: "${AIOS_RESOURCES_DIR:}"
+    scripts_dir: ""
+    docs_dir: ""
+    tests_dir: ""
+    logs_dir: "${AIOS_LOGS_DIR:}"
+
+  # ---- data/ subtree ------------------------------------------------------
+  data:
+    configs_dir: ""
+    cache_dir: "${AIOS_CACHE_DIR:}"
+    runtime_dir: ""
+    temp_dir: "${AIOS_TEMP_DIR:}"
+    backups_dir: ""
+    experience_dir: ""
+    learning_dir: ""
+    benchmark_dir: ""
+    memory_dir: "${AIOS_MEMORY_DIR:}"
+    graphs_dir: ""
+    experiments_dir: ""
+    patches_dir: ""
+    rollback_dir: ""
+    analytics_dir: ""
+    archive_dir: ""
+
+  # ---- resources/ subtree (read-only assets) -----------------------------
+  resources:
+    ai_models_dir: "${AIOS_MODELS_DIR:}"
+    prompts_dir: ""
+    templates_dir: ""
+    dictionaries_dir: ""
+    schemas_dir: ""
+
+  # ---- logs/ subtree ------------------------------------------------------
+  logs:
+    system_dir: ""
+    startup_dir: ""
+    events_dir: ""
+    errors_dir: ""
+    audit_dir: "${AIOS_AUDIT_LOG_DIR:}"
+    security_dir: "${AIOS_SECURITY_LOG_DIR:}"
+    plugins_dir: ""
+    agents_dir: ""
+    crashes_dir: ""
+
+  # ---- Directory creation policy -----------------------------------------
+  # Consumed alongside ProjectPaths.ensure_directories() during Phase 0.
+  create:
+    ensure_writable_tree: true      # create data/ and logs/ trees if missing
+    create_resources: false         # resources are shipped, not created
+    mode: "0o755"                   # POSIX dir mode (ignored on Windows)

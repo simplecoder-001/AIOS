@@ -1,0 +1,112 @@
+# app/core/configs/environment.yaml
+# ---------------------------------------------------------------------------
+# Per-environment configuration overlays.
+#
+# Applied as Layer 4 of the merge chain: only the block whose key matches the
+# resolved environment (AIOS_ENV -> development | testing | staging |
+# production) is deep-merged on top of defaults + app_config + domain files.
+#
+# Each block is intentionally SPARSE: list only the keys that must differ from
+# the base configuration for that environment. Unlisted keys inherit their
+# base values. Environment variable overrides (AIOS_CFG__...) still win last.
+# ---------------------------------------------------------------------------
+
+environments:
+
+  # -------------------------------------------------------------------------
+  # DEVELOPMENT — verbose, human-friendly, cloud allowed for iteration.
+  # -------------------------------------------------------------------------
+  development:
+    app:
+      debug: true
+      startup_timeout_seconds: 120     # relaxed while attaching debuggers
+    logging:
+      level: "DEBUG"
+      json_format: false               # readable console during dev
+      handlers:
+        file:
+          diagnose: true               # allow rich tracebacks locally ONLY
+    core:
+      database:
+        backup_on_startup: false       # faster restarts while iterating
+    feature_flags:
+      fg7_plugins: true                # develop/test plugins locally
+      fg9_agents: true
+      fg10_self_learning: true
+
+  # -------------------------------------------------------------------------
+  # TESTING — hermetic, offline, quiet. No cloud, no external I/O.
+  # -------------------------------------------------------------------------
+  testing:
+    app:
+      debug: true
+      shutdown_grace_seconds: 0
+      startup_timeout_seconds: 30
+    logging:
+      level: "WARNING"
+      console: false
+      file: false                      # tests capture logs via fixtures
+      json_format: false
+    core:
+      database:
+        backup_on_startup: false
+        enable_wal: false              # simpler teardown for temp DBs
+      cache:
+        default_ttl_seconds: 1         # force cache-miss paths in tests
+    feature_flags:
+      cloud_llm: false                 # offline-only: no Groq calls in CI
+      online_search: false             # no Tavily/Brave/DDG in CI
+      fg7_plugins: false
+      fg9_agents: false
+      fg10_self_learning: false
+    model_registry:
+      prefer_local: true
+
+  # -------------------------------------------------------------------------
+  # STAGING — production-like, structured logs, safe feature exposure.
+  # -------------------------------------------------------------------------
+  staging:
+    app:
+      debug: false
+    logging:
+      level: "INFO"
+      json_format: true
+      handlers:
+        file:
+          diagnose: false
+    core:
+      database:
+        backup_on_startup: true
+    feature_flags:
+      fg7_plugins: false
+      fg9_agents: false
+      fg10_self_learning: false
+
+  # -------------------------------------------------------------------------
+  # PRODUCTION — locked down, fail-secure, minimal surface area.
+  # -------------------------------------------------------------------------
+  production:
+    app:
+      debug: false
+      high_load_mode: false
+      startup_timeout_seconds: 60
+    logging:
+      level: "${AIOS_LOG_LEVEL:INFO}"
+      json_format: true
+      handlers:
+        console:
+          enabled: false              # headless desktop service: file-only
+        file:
+          diagnose: false             # never leak values in prod logs
+    core:
+      database:
+        backup_on_startup: true
+        enable_wal: true
+    feature_flags:
+      # Autonomy / untrusted-code surfaces stay OFF until explicitly enabled
+      # by an administrator at runtime (fail-secure, least privilege).
+      fg7_plugins: false
+      fg9_agents: false
+      fg10_self_learning: false
+    model_registry:
+      prefer_local: true

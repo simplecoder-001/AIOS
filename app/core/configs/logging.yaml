@@ -1,0 +1,103 @@
+# app/core/configs/logging.yaml
+# ---------------------------------------------------------------------------
+# Logging configuration.
+#
+# Merged into the top-level "logging" section (Layer 3). The core validated
+# keys (level, console, file, json_format, rotation_mb, retention_days) are
+# enforced by config_validator._LoggingModel. Additional sub-sections below
+# pass through (extra="allow") and configure the concrete sinks/routing used
+# by app/logging and the logs/ directory tree.
+#
+# Interpolation: ${VAR:default} expands from the environment at load time.
+# ---------------------------------------------------------------------------
+
+logging:
+  # ---- Core (validated) keys ---------------------------------------------
+  level: "${AIOS_LOG_LEVEL:INFO}"     # DEBUG | INFO | WARNING | ERROR | CRITICAL
+  console: true
+  file: true
+  json_format: true                    # structured logs for prod/staging
+  rotation_mb: 20                      # rotate a file once it exceeds this size
+  retention_days: 14                   # keep rotated files this long
+
+  # ---- Formatting ---------------------------------------------------------
+  formats:
+    console: "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level:<8}</level> | <cyan>{extra[subsystem]}</cyan> | {message}"
+    file: "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {extra[subsystem]} | {name}:{function}:{line} | {message}"
+    date_format: "YYYY-MM-DD HH:mm:ss.SSS"
+
+  # ---- Global handler policy ---------------------------------------------
+  handlers:
+    console:
+      enabled: true
+      colorize: true
+      # Console stays human-readable even when file logs are JSON.
+      json_format: false
+    file:
+      enabled: true
+      compression: "zip"               # compress rotated files
+      encoding: "utf-8"
+      enqueue: true                    # async, thread-safe writes (FG1 threads)
+      backtrace: true
+      diagnose: false                  # never leak variable values in prod
+
+  # ---- Async / performance ------------------------------------------------
+  performance:
+    async_write: true                  # non-blocking sinks so logging never
+                                       # stalls the voice/brain hot paths
+    buffer_size: 4096
+    flush_interval_seconds: 2
+
+  # ---- Per-subsystem routing ---------------------------------------------
+  # Maps a logical subsystem to a directory under logs/ and an optional
+  # override level. Directories correspond to the logs/ tree in the folder
+  # structure. app/logging resolves the absolute paths via ProjectPaths.
+  routing:
+    default:
+      directory: "system"
+      filename: "system.log"
+    startup:
+      directory: "startup"
+      filename: "startup.log"
+    events:
+      directory: "events"
+      filename: "events.log"
+    errors:
+      directory: "errors"
+      filename: "errors.log"
+      level: "ERROR"
+    audit:
+      directory: "audit"
+      filename: "audit.log"
+      # Audit trail must be tamper-evident; never drop below INFO.
+      level: "INFO"
+      json_format: true
+    security:
+      directory: "security"
+      filename: "security.log"
+      level: "INFO"
+      json_format: true
+    plugins:
+      directory: "plugins"
+      filename: "plugins.log"
+    agents:
+      directory: "agents"
+      filename: "agents.log"
+    crashes:
+      directory: "crashes"
+      filename: "crashes.log"
+      level: "ERROR"
+
+  # ---- Audit / integrity --------------------------------------------------
+  # Supports FG6 Layer 9 (Audit & Tamper Protection): SHA-256 + HMAC chaining.
+  audit:
+    enabled: true
+    integrity_hashing: true            # SHA-256 per record
+    hmac_signing: true                 # HMAC message authentication
+    separate_sink: true                # audit log isolated from app logs
+
+  # ---- Noise control ------------------------------------------------------
+  suppress_loggers:
+    - "urllib3"
+    - "asyncio"
+    - "PIL"

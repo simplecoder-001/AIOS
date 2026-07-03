@@ -1,0 +1,97 @@
+# app/core/configs/language_policy.yaml
+# ---------------------------------------------------------------------------
+# Multilingual language & reply policy.
+#
+# Merged into the top-level "language_policy" section (Layer 3). Validated keys
+# (default_language, mode, supported, preserve_technical_vocabulary,
+# avoid_unnecessary_switching) are enforced by _LanguagePolicyModel. The
+# capability registry, role rules, and stability thresholds below pass through
+# (extra="allow") and are consumed by the FG4 Language Policy Engine and the
+# Conversation Language State Machine.
+#
+# Principle (FG4): the architecture is language-agnostic. Adding a language is
+# a config change here + in the model registry, never a code change.
+# ---------------------------------------------------------------------------
+
+language_policy:
+
+  # ---- Validated core keys -----------------------------------------------
+  default_language: "en"
+  mode: "smart"                    # smart | fixed | follow
+  supported: ["en", "hi", "hinglish", "or"]
+  preserve_technical_vocabulary: true
+  avoid_unnecessary_switching: true
+
+  # ---- Language capability registry --------------------------------------
+  # Mirrors FG4's Language Capability Registry: which pipelines each language
+  # supports. Adding a language = add an entry here + register its models.
+  capabilities:
+    en:
+      stt: true
+      tts: true
+      translation: true
+      emotion: true
+      voice: "kokoro_en"
+    hi:
+      stt: true
+      tts: true
+      translation: true
+      emotion: true
+      voice: "kokoro_hi"
+    hinglish:                       # code-mixed; preserved, not translated
+      stt: true
+      tts: true
+      translation: false
+      emotion: true
+      voice: "kokoro_hi"
+    or:                             # Odia
+      stt: true
+      tts: true
+      translation: true
+      emotion: true
+      voice: "kokoro_hi"
+
+  # ---- Confidence thresholds (FG4 Confidence Decision Engine) ------------
+  confidence:
+    very_high: 0.90                 # trust detected language outright
+    likely: 0.70                    # likely language
+    mixed: 0.50                     # treat as code-mixed below this
+    # < mixed  -> unknown: fall back to conversation/default language
+
+  # ---- Reply-language policy by role -------------------------------------
+  # FG4: Admins get replies in the detected conversation language; normal
+  # users get the configured default unless smart mode overrides.
+  reply_policy:
+    admin: "detected"               # follow detected conversation language
+    super_admin: "detected"
+    user: "default"                 # use default_language
+    guest: "default"
+    system: "default"
+
+  # ---- Smart-mode behavior ------------------------------------------------
+  smart_mode:
+    follow_dominant_language: true  # track dominant language of the session
+    respect_explicit_requests: true # "reply in Hindi" always wins
+    learn_preferences: true         # persist per-user language profile
+    preserve_technical_terms: true  # keep code/tech vocab in English
+    fallback_language: "en"
+
+  # ---- Conversation stability (anti-thrash) ------------------------------
+  # Prevents unstable switching described in the FG4 state machine.
+  stability:
+    min_turns_before_switch: 2      # require sustained signal before switching
+    max_switches_per_session: 4
+    switch_confidence_margin: 0.15  # new language must beat current by margin
+
+  # ---- Translation policy -------------------------------------------------
+  translation:
+    enabled: true
+    only_when_required: true        # FG4: never translate unnecessarily
+    cache_enabled: true             # translation memory cache
+    skip_for_code_mixed: true       # preserve Hinglish/Odia-English as-is
+
+  # ---- Technical vocabulary preservation ---------------------------------
+  technical_vocabulary:
+    enabled: true
+    # Terms kept in their original (usually English) form across languages.
+    keep_original: ["VS Code", "Chrome", "GitHub", "Python", "CUDA", "GPU", "API", "terminal"]

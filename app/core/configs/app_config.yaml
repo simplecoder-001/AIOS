@@ -1,0 +1,60 @@
+# app/core/configs/app_config.yaml
+# ---------------------------------------------------------------------------
+# Top-level application & core-runtime configuration.
+#
+# Merged at the ROOT of the config tree (Layer 2 of the merge chain), on top
+# of defaults.py and beneath the per-environment overlay + env overrides.
+#
+# Interpolation: ${VAR} or ${VAR:default} is expanded from the process
+# environment at load time (see config_loader._interpolate_value).
+# ---------------------------------------------------------------------------
+
+app:
+  name: "AIOS"
+  display_name: "Personal AI Operating System"
+  version: "${AIOS_VERSION:0.1.0}"
+  # Authoritative environment is stamped by the loader; this is only a hint.
+  environment: "${AIOS_ENV:production}"
+  debug: false
+
+  # FG3: when true, non-essential background monitoring is suppressed while
+  # the user runs intensive, explicitly-requested tasks (High Load Mode).
+  high_load_mode: false
+
+  # Graceful shutdown / startup budgets (seconds).
+  shutdown_grace_seconds: 10
+  startup_timeout_seconds: 60
+
+  # Hardware profile. Targets from the FG1 SDD (Ryzen 7 + RTX 5050, <3 GB RAM).
+  hardware:
+    cpu_target: "Ryzen 7"
+    gpu_target: "RTX 5050"
+    gpu_enabled: true
+    max_ram_gb: 3.0
+
+# ---------------------------------------------------------------------------
+# Core runtime subsystems (Phase 0 infrastructure).
+# ---------------------------------------------------------------------------
+core:
+  event_bus:
+    max_queue_size: 10000        # backpressure ceiling for the central bus
+    dispatch_workers: 4          # dispatcher thread-pool size
+    enable_event_store: true     # persist events for replay/audit
+
+  state_manager:
+    persist_state: true
+    snapshot_interval_seconds: 30
+
+  database:
+    sqlite_busy_timeout_ms: 5000
+    enable_wal: true             # FG6 recovery relies on SQLite WAL
+    backup_on_startup: true
+
+  cache:
+    default_ttl_seconds: 3600
+    search_cache_ttl_days: 3     # FG2 temporary search cache (3-day TTL)
+    max_memory_items: 5000
+
+  queues:
+    default_maxsize: 1000
+    priority_levels: 4           # FG3: Critical / High / Normal / Low

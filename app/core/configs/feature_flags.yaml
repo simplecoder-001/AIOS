@@ -1,0 +1,105 @@
+# app/core/configs/feature_flags.yaml
+# ---------------------------------------------------------------------------
+# Feature flags.
+#
+# Merged into the top-level "feature_flags" section (Layer 3). The validator
+# treats this section as open-ended (extra="allow"), so both flat feature-group
+# toggles and nested capability groups are permitted.
+#
+# Read patterns:
+#   ConfigManager.is_feature_enabled("fg2_brain")      -> top-level toggles
+#   ConfigManager.get("feature_flags.brain.cloud_llm") -> nested capabilities
+#
+# Safety posture: anything that runs untrusted code (plugins), acts
+# autonomously (agents), or modifies the system itself (self-learning) is
+# DISABLED by default and must be enabled explicitly (fail-secure).
+# ---------------------------------------------------------------------------
+
+feature_flags:
+
+  # ---- Master feature-group switches -------------------------------------
+  fg1_voice: true                 # Voice Interaction System
+  fg2_brain: true                 # AI Brain & Intelligence
+  fg3_windows_control: true       # Windows System Control
+  fg4_language: true              # Multilingual Language Intelligence
+  fg5_gui: true                   # GUI & User Experience
+  fg6_security: true              # Security & Permission System
+  fg7_plugins: false              # Plugin & Extension System (untrusted code)
+  fg8_productivity: true          # Productivity features
+  fg9_agents: false               # Autonomous Agent System
+  fg10_self_learning: false       # Self-Learning / Developer Tools
+
+  # ---- Global cross-cutting toggles --------------------------------------
+  online_search: true             # allow any realtime web search
+  cloud_llm: true                 # allow Groq (cloud) inference
+  telemetry: true                 # local performance/health metrics
+  gpu_acceleration: true          # allow CUDA/WGPU paths
+
+  # ---- FG1: Voice capabilities -------------------------------------------
+  voice:
+    wake_word: true
+    speaker_verification: true
+    continuous_verification: true
+    interrupt_detection: true
+    streaming_stt: true
+    streaming_tts: true
+
+  # ---- FG2: Brain capabilities -------------------------------------------
+  brain:
+    local_llm: true               # Gemma via llama.cpp
+    cloud_llm: true               # Groq (gated by global cloud_llm too)
+    realtime_search: true
+    planner: true
+    knowledge_graph: true
+    semantic_cache: true
+    memory_versioning: true
+
+  # ---- FG3: Windows control capabilities ---------------------------------
+  windows_control:
+    native_automation: true       # Tier 1 (pywin32 / pywinauto)
+    vision_automation: true       # Tier 2 (YOLO + PaddleOCR)
+    vision_language: true         # Tier 3 (GoClick / Florence-2)
+    high_risk_commands: false     # delete/registry/shutdown gated OFF
+    rollback: true
+
+  # ---- FG4: Language capabilities ----------------------------------------
+  language:
+    auto_detection: true
+    code_mixed: true              # Hinglish / Odia-English preservation
+    translation: true
+    emotion_detection: true
+    accent_learning: true
+
+  # ---- FG5: GUI capabilities ---------------------------------------------
+  gui:
+    dashboard: true
+    companion_2d: true            # Live2D
+    companion_3d: false           # heavier; opt-in
+    smart_cursor: true
+    tutorials: true
+
+  # ---- FG6: Security capabilities ----------------------------------------
+  security:
+    hardware_binding: true        # TPM / device fingerprint
+    mfa: true
+    ai_firewall: true
+    sandbox: true
+    encryption_at_rest: true
+
+  # ---- FG7: Plugin capabilities (only meaningful if fg7_plugins=true) ----
+  plugins:
+    hot_reload: false
+    network_access: false         # admin-approved per plugin
+    signature_verification: true  # never disable in production
+
+  # ---- FG9: Agent capabilities (only meaningful if fg9_agents=true) ------
+  agents:
+    autonomous_execution: false
+    multi_step_planning: false
+    parallel_tasks: false
+
+  # ---- FG10: Self-learning capabilities ----------------------------------
+  self_learning:
+    experience_collection: false
+    auto_patching: false          # self-modifying code stays OFF
+    experiments: false
