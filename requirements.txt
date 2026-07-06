@@ -1,0 +1,6 @@
+sqlcipher3
+qdrant_client
+torch
+numpy
+sentence_transformers
+networkx 
